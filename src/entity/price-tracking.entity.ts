@@ -1,5 +1,5 @@
 import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
-import { Products } from "./Products";
+import { Products } from "./products.entity";
 
 @Entity()
 export class PriceTracking {
@@ -8,12 +8,6 @@ export class PriceTracking {
 
   @Column({ type: 'double' })
   fetchedPrice: number;
-
-  @Column({ type: 'boolean', nullable: false })
-  priceDecreased: boolean;
-
-  @Column({ type: 'double' })
-  priceDifference: number;
 
   @Column({ type: 'boolean', default: false })
   outOfStock: boolean;
@@ -24,6 +18,6 @@ export class PriceTracking {
   @CreateDateColumn()
   createdAt: string;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ select: false })
   updatedAt: string;
 }

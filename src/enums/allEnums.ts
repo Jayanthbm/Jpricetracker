@@ -3,5 +3,3 @@ export enum storesEnum {
   amazon = 'amazon',
   myntra ='myntra'
 }
-
-export const allStores = Object.values(storesEnum);
