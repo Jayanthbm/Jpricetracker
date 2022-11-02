@@ -1,5 +1,6 @@
-import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, Timestamp, UpdateDateColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
 import { storesEnum } from "../enums/allEnums";
+import { ProductTracking } from "./product-tracking.entity";
 import { PriceTracking } from "./price-tracking.entity";
 
 @Entity()
@@ -27,4 +28,7 @@ export class Products {
 
   @OneToMany(() => PriceTracking, (price) => price.product)
   trackedPrice: PriceTracking[]
+
+  @OneToMany(() => ProductTracking, (track) => track.product)
+  trackedProduct: ProductTracking[]
 }

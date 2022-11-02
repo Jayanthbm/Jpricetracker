@@ -5,15 +5,16 @@ const jsdom = require("jsdom");
 const fs = require("fs")
 const path = require("path")
 const handlebars = require("handlebars")
-
+var cron = require('node-cron');
 import { AppDataSource } from "./data-source"
 import { storesEnum } from "./enums/allEnums";
 import { addProductValidator, getStoreName, myCustomSort, validateBody } from "./helpers";
 import { fetchProductDocument, queryOutOfStock, queryProductName, queryProductPrice } from "./scrapper";
-import { getAllProducts } from "./db";
+import { getAllProducts, getProductByUrl, getTrackedProductByIdEmail, getTrackedProductsByIdPrice } from "./db";
 import { sendEmail } from "./email";
 import { Products } from "./entity/products.entity";
 import { PriceTracking } from "./entity/price-tracking.entity";
+import { ProductTracking } from "./entity/product-tracking.entity";
 
 
 const { JSDOM } = jsdom;
@@ -23,6 +24,9 @@ const { JSDOM } = jsdom;
     try {
         const dataSource = await AppDataSource.initialize();
         console.log("Connection Successful to DB");
+        // cron.schedule('*/5 * * * *', async () => {
+        //     console.log('running a task every 5 mins');
+        // });
         var products = await getAllProducts(dataSource);
         console.log(`${products?.length} Products Found`);
         var sortedProd = myCustomSort(products);
@@ -36,40 +40,30 @@ const { JSDOM } = jsdom;
             let storedProduct = sortedProd[i];
             let data = await fetchProductDocument(storedProduct?.url);
             const { document } = new JSDOM(data).window;
-            let oldPrice = storedProduct?.price;
-            let priceDecreased = false;
-            let targetPrice = storedProduct?.targetPrice;
-            let productPrice = queryProductPrice(document, storesEnum[`${storedProduct?.store}`]);
-            let outofStock = queryOutOfStock(document, storesEnum[`${storedProduct?.store}`]);
-            if (productPrice < oldPrice) {
-                priceDecreased = true;
-            }
-            let priceDifference = Math.abs(oldPrice - productPrice);
 
-            // Check if Product reached target price and
-            if (productPrice <= targetPrice) {
-                let tmpNotify = {
-                    url: storedProduct.url,
-                    store: storedProduct.store,
-                    productName: storedProduct?.productName,
-                    targetPrice: storedProduct?.targetPrice,
-                    currentPrice: productPrice,
-                    priceDifference,
-                    email: storedProduct.email,
-                    mobile: storedProduct?.mobile
+                let productPrice = queryProductPrice(document, storesEnum[`${storedProduct?.store}`]);
+                let outofStock = queryOutOfStock(document, storesEnum[`${storedProduct?.store}`]);
+
+                let tmp = {
+                    fetchedPrice: productPrice,
+                    outOfStock: outofStock,
+                    product: storedProduct?.id,
                 }
-                toNotify.push(tmpNotify)
+                finalInsert.push(tmp);
+
+                // Get All users who tracked the product
+                let trackedInfo = await getTrackedProductsByIdPrice(dataSource, storedProduct.id, productPrice);
+                for (let n = 0; n < trackedInfo.length; n++) {
+                    toNotify.push({
+                        productName: storedProduct?.productName,
+                        targetPrice: trackedInfo[i].targetPrice,
+                        email: trackedInfo[i].email,
+                        mobile: trackedInfo[i].mobile,
+                        currentPrice: productPrice,
+                    })
+                }
             }
 
-            let tmp = {
-                fetchedPrice: productPrice,
-                product: storedProduct?.id,
-                priceDifference: priceDifference,
-                priceDecreased: priceDecreased,
-                outOfStock: outofStock,
-            }
-            finalInsert.push(tmp);
-        }
         if (finalInsert?.length > 0) {
             await dataSource.createQueryBuilder().insert().into(PriceTracking).orIgnore().values(finalInsert).execute();
         }
@@ -79,15 +73,16 @@ const { JSDOM } = jsdom;
                 targetPrice: toNotify[i].targetPrice,
                 price: toNotify[i].currentPrice,
 
-            });
-            let emailToSend = {
-                to: toNotify[i].email,
-                subject: `${toNotify[i].productName} Price Dropped to ${toNotify[i].currentPrice}`,
-                html: htmlToSend
-            }
-            await sendEmail(emailToSend);
+                });
+                let emailToSend = {
+                    to: toNotify[i].email,
+                    subject: `${toNotify[i].productName} Price Dropped to ${toNotify[i].currentPrice}`,
+                    html: htmlToSend
+                }
+                await sendEmail(emailToSend);
 
-        }
+            }
+
     } catch (error) {
         console.log("Error Connecting to DB", error)
     }
@@ -111,24 +106,38 @@ app.post('/addProduct', validateBody(addProductValidator), async (req, res) => {
         let productPrice: number = 0;
         let store = '';
         let productName = '';
-        let outofStock = false;
         store = getStoreName(url);
-        let data = await fetchProductDocument(url);
-        const { document } = new JSDOM(data).window;
-        productName = queryProductName(document, storesEnum[`${store}`]);
-        productPrice = queryProductPrice(document, storesEnum[`${store}`]);
-        outofStock = queryOutOfStock(document, storesEnum[`${store}`]);
-        const product = new Products();
-        product.url = url;
-        product.price = productPrice;
-        product.store = storesEnum[`${store}`];
-        product.productName = productName;
-        await AppDataSource.getRepository(Products).save(product);
+        url = url.split('?')[0];
+        let product = await getProductByUrl(AppDataSource, url);
+        let savedProduct;
+        if (product) {
+            savedProduct = product;
+        } else {
+            let data = await fetchProductDocument(url);
+            const { document } = new JSDOM(data).window;
+            productName = queryProductName(document, storesEnum[`${store}`]);
+            productPrice = queryProductPrice(document, storesEnum[`${store}`]);
+            product = new Products();
+            product.url = url
+            product.productName = productName;
+            product.price = productPrice;
+            product.store = storesEnum[`${store}`];
+            savedProduct = await AppDataSource.manager.save(product);
+        }
+
+        let tracked = await getTrackedProductByIdEmail(AppDataSource, savedProduct?.id, email);
+        if (!tracked) {
+            tracked = new ProductTracking();
+        }
+        tracked.targetPrice = targetPrice;
+        tracked.email = email;
+        tracked.mobile = mobile;
+        tracked.product = savedProduct;
+        await AppDataSource.manager.save(tracked)
+
         res.send({
             type: 'success',
-            message: 'Product Added',
-            product,
-            outofStock
+            message: 'Product Tracked',
         })
     } catch (error) {
         let message = 'Error Adding the product'
