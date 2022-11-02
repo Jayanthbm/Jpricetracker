@@ -15,73 +15,72 @@ import { sendEmail } from "./email";
 import { Products } from "./entity/products.entity";
 import { PriceTracking } from "./entity/price-tracking.entity";
 import { ProductTracking } from "./entity/product-tracking.entity";
-
-
 const { JSDOM } = jsdom;
-
+import { createSpinner } from 'nanospinner'
 // Main Function
 (async () => {
     try {
+        const dbspinner = createSpinner('Connecting To DB').start()
         const dataSource = await AppDataSource.initialize();
-        console.log("Connection Successful to DB");
+        dbspinner.success({ text: 'Connection Successful to DB!', mark: ':)' })
         // cron.schedule('*/5 * * * *', async () => {
         //     console.log('running a task every 5 mins');
         // });
-        var products = await getAllProducts(dataSource);
-        console.log(`${products?.length} Products Found`);
-        var sortedProd = myCustomSort(products);
+        // var products = await getAllProducts(dataSource);
+        // console.log(`${products?.length} Products Found`);
+        // var sortedProd = myCustomSort(products);
 
-        const priceDropTemplate = fs.readFileSync(path.join(__dirname, "/templates/pricedrop.hbs"), "utf8")
-        const template = handlebars.compile(priceDropTemplate);
+        // const priceDropTemplate = fs.readFileSync(path.join(__dirname, "/templates/pricedrop.hbs"), "utf8")
+        // const template = handlebars.compile(priceDropTemplate);
 
-        var finalInsert = [];
-        var toNotify = [];
-        for (let i = 0; i < sortedProd?.length; i++) {
-            let storedProduct = sortedProd[i];
-            let data = await fetchProductDocument(storedProduct?.url);
-            const { document } = new JSDOM(data).window;
+        // var finalInsert = [];
+        // var toNotify = [];
+        // for (let i = 0; i < sortedProd?.length; i++) {
+        //     let storedProduct = sortedProd[i];
+        //     let data = await fetchProductDocument(storedProduct?.url);
+        //     const { document } = new JSDOM(data).window;
 
-                let productPrice = queryProductPrice(document, storesEnum[`${storedProduct?.store}`]);
-                let outofStock = queryOutOfStock(document, storesEnum[`${storedProduct?.store}`]);
+        //     let productPrice = queryProductPrice(document, storesEnum[`${storedProduct?.store}`]);
+        //     let outofStock = queryOutOfStock(document, storesEnum[`${storedProduct?.store}`]);
 
-                let tmp = {
-                    fetchedPrice: productPrice,
-                    outOfStock: outofStock,
-                    product: storedProduct?.id,
-                }
-                finalInsert.push(tmp);
+        //     let tmp = {
+        //         fetchedPrice: productPrice,
+        //         outOfStock: outofStock,
+        //         product: storedProduct?.id,
+        //     }
+        //     finalInsert.push(tmp);
 
-                // Get All users who tracked the product
-                let trackedInfo = await getTrackedProductsByIdPrice(dataSource, storedProduct.id, productPrice);
-                for (let n = 0; n < trackedInfo.length; n++) {
-                    toNotify.push({
-                        productName: storedProduct?.productName,
-                        targetPrice: trackedInfo[i].targetPrice,
-                        email: trackedInfo[i].email,
-                        mobile: trackedInfo[i].mobile,
-                        currentPrice: productPrice,
-                    })
-                }
-            }
+        //     // Get All users who tracked the product
+        //     let trackedInfo = await getTrackedProductsByIdPrice(dataSource, storedProduct.id, productPrice);
+        //     for (let n = 0; n < trackedInfo.length; n++) {
+        //         toNotify.push({
+        //             productName: storedProduct?.productName,
+        //             targetPrice: trackedInfo[i].targetPrice,
+        //             email: trackedInfo[i].email,
+        //             mobile: trackedInfo[i].mobile,
+        //             currentPrice: productPrice,
+        //         })
+        //     }
+        // }
 
-        if (finalInsert?.length > 0) {
-            await dataSource.createQueryBuilder().insert().into(PriceTracking).orIgnore().values(finalInsert).execute();
-        }
-        for (let i = 0; i < toNotify?.length; i++) {
-            const htmlToSend = template({
-                productName: toNotify[i].productName,
-                targetPrice: toNotify[i].targetPrice,
-                price: toNotify[i].currentPrice,
+        // if (finalInsert?.length > 0) {
+        //     await dataSource.createQueryBuilder().insert().into(PriceTracking).orIgnore().values(finalInsert).execute();
+        // }
+        // for (let i = 0; i < toNotify?.length; i++) {
+        //     const htmlToSend = template({
+        //         productName: toNotify[i].productName,
+        //         targetPrice: toNotify[i].targetPrice,
+        //         price: toNotify[i].currentPrice,
 
-                });
-                let emailToSend = {
-                    to: toNotify[i].email,
-                    subject: `${toNotify[i].productName} Price Dropped to ${toNotify[i].currentPrice}`,
-                    html: htmlToSend
-                }
-                await sendEmail(emailToSend);
+        //     });
+        //     let emailToSend = {
+        //         to: toNotify[i].email,
+        //         subject: `${toNotify[i].productName} Price Dropped to ${toNotify[i].currentPrice}`,
+        //         html: htmlToSend
+        //     }
+        //     await sendEmail(emailToSend);
 
-            }
+        // }
 
     } catch (error) {
         console.log("Error Connecting to DB", error)
@@ -151,4 +150,7 @@ app.post('/addProduct', validateBody(addProductValidator), async (req, res) => {
     }
 })
 
-app.listen(port, () => console.log(`Price Tracker app listening on port ${port}!`))
+app.listen(port, () => {
+    const aSpinner = createSpinner('Starting Server').start()
+    aSpinner.success({ text: `Price Tracker app listening on port ${port}!`, mark: ':)' })
+})
