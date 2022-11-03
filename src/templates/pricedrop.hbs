@@ -1,15 +1,62 @@
-<html>
+<!DOCTYPE html>
+<html lang="en-US">
 
 <head>
-  <title>Price Dropped for {{productName}}</title>
+  <meta charset="utf-8">
 </head>
 
 <body>
-  <div>
-    <span style="font-weight: bold;">{{productName}} reached your {{targetPrice}}</span>
-    <span> Current Price is {{price}}</span>
-    <span><a href={{productLink}}>Buy Now</a></span>
+  <style>
+    table,
+    th,
+    td {
+      border: 1px solid black;
+      border-collapse: collapse;
+    }
+  
+    th,
+    td {
+      padding: 5px;
+      text-align: left;
+    }
+  
+    .button {
+      background-color: #4CAF50;
+      border: none;
+      color: white;
+      padding: 15px 32px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+      margin: 4px 2px;
+      cursor: pointer;
+    }
+  </style>
+  
+  
+  <div style="background:#F9F9F9; max-width:900px; margin:0 auto; width:100%; padding:2em .5em;box-sizing:border-box;">
+  
+    <div style="background:#fff; border-radius:15px; max-width:800px; width:100%; margin:2em auto;
+      padding:2em; box-sizing:border-box; box-shadow:0 1px 7px rgba(0,0,0,.07);">
+      <div style="font-size:24px; font-weight:400; color:#4B0082; margin-bottom:1em;">
+        {{productName}} at {{store}} has reached your target price of <b> ₹{{targetPrice}} </b><br>
+      </div>
+  
+      <div style="font-size:24px; font-weight:400; color:#d90d9c; margin-bottom:1em;">
+        {{productName}} now rpiced at <b> ₹{{price}}</b><br>
+      </div>
+      <div style="text-align: center; margin-top:1em; ">
+        <a href="{{url}}" class="button" target="_blank">Link Button</a>
+      </div>
+    </div>
+  
+  
+    <div style="text-align: center; margin-top:1em; ">
+      <div style="color:#737373; font-size:13px; ">Made with ❤ in India</div>
+    </div>
   </div>
+
 </body>
 
 </html>
