@@ -8,7 +8,7 @@ export class Products {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'text', nullable: false, unique: true })
+  @Column({ type: 'varchar', nullable: false, unique: true })
   url: string;
 
   @Column({ type: 'varchar', nullable: true })
