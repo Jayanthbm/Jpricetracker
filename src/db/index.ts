@@ -62,10 +62,8 @@ export const getTrackedProductsById = async (dataSource: any, productId: number)
 
 export const getTrackedProductByIdEmail = async (dataSource: any, productId: number, email: string): Promise<ProductTracking> => {
   try {
-    const trackedInfo = await dataSource.getRepository(ProductTracking).findOneBy({
-      product: productId,
-      email: email
-    });
+    const trackedInfo = await dataSource.getRepository(ProductTracking).createQueryBuilder('pt').where("pt.productId =:productId", { productId })
+      .andWhere("pt.email = :email", { email }).getOne();
     return trackedInfo;
   } catch (error) {
     console.log("error fetching products", error);
