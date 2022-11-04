@@ -6,6 +6,8 @@ const fs = require("fs")
 const path = require("path")
 const handlebars = require("handlebars")
 var cron = require('node-cron');
+const chalk = require('chalk');
+const date = require('date-and-time');
 import { AppDataSource } from "./data-source"
 import { storesEnum } from "./enums/allEnums";
 import { addProductValidator, getStoreName, myCustomSort, validateBody } from "./helpers";
@@ -19,46 +21,64 @@ const { JSDOM } = jsdom;
 import { createSpinner } from 'nanospinner'
 // Main Function
 (async () => {
+    const dbspinner = createSpinner('Connecting To DB').start();
+    let dataSource, products = [], sortedProd = [], finalInsert = [], toNotify = [];
+    const priceDropTemplate = fs.readFileSync(path.join(__dirname, "/templates/pricedrop.hbs"), "utf8")
+    const template = handlebars.compile(priceDropTemplate);
     try {
-        const dbspinner = createSpinner('Connecting To DB').start()
-        const dataSource = await AppDataSource.initialize();
-        dbspinner.success({ text: 'Connection Successful to DB!', mark: ':)' })
-        cron.schedule('0 */2 * * *', async () => {
-            const dateObject = new Date();
-            const date = (`0 ${dateObject.getDate()}`).slice(-2);
-            const month = (`0 ${dateObject.getMonth() + 1}`).slice(-2);
-            const year = dateObject.getFullYear();
-            const hours = dateObject.getHours();
-            const minutes = dateObject.getMinutes();
-            const seconds = dateObject.getSeconds();
-            console.log(`fetching Product Prices - ${year}-${month}-${date} ${hours}:${minutes}:${seconds}`);
-            var products = await getAllProducts(dataSource);
-            console.log(`${products?.length} Products Found`);
-            var sortedProd = myCustomSort(products);
-
-            const priceDropTemplate = fs.readFileSync(path.join(__dirname, "/templates/pricedrop.hbs"), "utf8")
-            const template = handlebars.compile(priceDropTemplate);
-
-            var finalInsert = [];
-            var toNotify = [];
-            for (let i = 0; i < sortedProd?.length; i++) {
-                let storedProduct = sortedProd[i];
+        dataSource = await AppDataSource.initialize();
+    } catch (error) {
+        console.log("Error Intialising Data store", error);
+    }
+    dbspinner.success({ text: 'Connection Successful to DB!', mark: ':)' });
+    cron.schedule('0 */2 * * *', async () => {
+        const now = new Date();
+        console.log('Running Scheduler at ' + chalk.red(date.format(now, 'DD MMM YY hh:mm A')))
+        console.log(chalk.blue.bold("####################### Fetching Product Prices ###########################"));
+        try {
+            products = await getAllProducts(dataSource);
+            console.log(chalk.red(`${products?.length} Products Found`));
+            sortedProd = myCustomSort(products);
+        } catch (error) {
+            console.log("Error Fetching products", error);
+        }
+        for (let i = 0; i < sortedProd.length; i++) {
+            try {
+                let storedProduct = sortedProd[i], productPrice, outofStock = false, trackedInfo;
+                console.log('Fetchng ' + chalk.yellow(storedProduct.productName) + ' details from ' + chalk.red(storedProduct.store.toUpperCase()));
                 let data = await fetchProductDocument(storedProduct?.url);
                 const { document } = new JSDOM(data).window;
-
-                let productPrice = queryProductPrice(document, storesEnum[`${storedProduct?.store}`]);
-                let outofStock = queryOutOfStock(document, storesEnum[`${storedProduct?.store}`]);
-
-                let tmp = {
-                    fetchedPrice: productPrice,
-                    outOfStock: outofStock,
-                    product: storedProduct?.id,
+                try {
+                    productPrice = queryProductPrice(document, storesEnum[`${storedProduct?.store}`]);
+                    console.log('Fetched Price: ₹' + chalk.green(productPrice));
+                } catch (error) {
+                    console.log("Error fetching price", error);
                 }
-                finalInsert.push(tmp);
+                try {
+                    outofStock = queryOutOfStock(document, storesEnum[`${storedProduct?.store}`]);
+                } catch (error) {
+                    console.log("Error fetching stock information", error);
+                }
+
+                if (productPrice > 0) {
+                    let tmp = {
+                        fetchedPrice: productPrice,
+                        outOfStock: outofStock,
+                        product: storedProduct?.id,
+                    }
+                    finalInsert.push(tmp);
+                }
 
                 if (!outofStock) {
-                    // Get All users who tracked the product
-                    let trackedInfo = await getTrackedProductsByIdPrice(dataSource, storedProduct.id, productPrice);
+                    console.log(chalk.green('Product In Stock'));
+                    try {
+                        // Get All users who tracked the product
+                        trackedInfo = await getTrackedProductsByIdPrice(dataSource, storedProduct.id, productPrice);
+                        console.log(trackedInfo?.length + " user(s) reached the target price");
+                    } catch (error) {
+                        console.log("Error fetching product tracking infromation")
+                    }
+
                     for (let n = 0; n < trackedInfo.length; n++) {
                         toNotify.push({
                             productName: storedProduct?.productName,
@@ -70,33 +90,37 @@ import { createSpinner } from 'nanospinner'
                             currentPrice: productPrice,
                         })
                     }
+                } else {
+                    console.log(chalk.red('Product Out of Stock'));
                 }
-            }
+                console.log(chalk.red("--------------------------------------------------"));
+            } catch (error) {
 
-            if (finalInsert?.length > 0) {
-                await dataSource.createQueryBuilder().insert().into(PriceTracking).orIgnore().values(finalInsert).execute();
             }
-            for (let i = 0; i < toNotify?.length; i++) {
-                const htmlToSend = template({
-                    productName: toNotify[i].productName,
-                    targetPrice: toNotify[i].targetPrice,
-                    price: toNotify[i].currentPrice,
-                    store: toNotify[i].store,
-                    url: toNotify[i].url
-                });
-                let emailToSend = {
-                    to: toNotify[i].email,
-                    subject: `${toNotify[i].productName} Price Dropped to ${toNotify[i].currentPrice}`,
-                    html: htmlToSend
-                }
-                await sendEmail(emailToSend);
+        }
+
+        if (finalInsert?.length > 0) {
+            let ins = await dataSource.createQueryBuilder().insert().into(PriceTracking).orIgnore().values(finalInsert).execute();
+            console.log(chalk.green(ins.raw.affectedRows + ' rows added'))
+        }
+        for (let i = 0; i < toNotify?.length; i++) {
+            console.log(chalk.yellow("Sending Email to ") + chalk.green(toNotify[i].email));
+            const htmlToSend = template({
+                productName: toNotify[i].productName,
+                targetPrice: toNotify[i].targetPrice,
+                price: toNotify[i].currentPrice,
+                store: toNotify[i].store,
+                url: toNotify[i].url
+            });
+            let emailToSend = {
+                to: toNotify[i].email,
+                subject: `${toNotify[i].productName} Price Dropped to ${toNotify[i].currentPrice}`,
+                html: htmlToSend
             }
-        });
-
-
-    } catch (error) {
-        console.log("Error Connecting to DB", error)
-    }
+            await sendEmail(emailToSend);
+        }
+        console.log(chalk.red("########################## Fetching Complete #############################"));
+    });
 })();
 
 const app = express();
