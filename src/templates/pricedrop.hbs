@@ -13,47 +13,46 @@
       border: 1px solid black;
       border-collapse: collapse;
     }
-  
+
     th,
     td {
       padding: 5px;
       text-align: left;
     }
-  
-    .button {
+
+    .button,
+    .button:hover {
       background-color: #4CAF50;
       border: none;
       color: white;
-      padding: 15px 32px;
+      padding: 10px 25px;
       text-align: center;
       text-decoration: none;
       display: inline-block;
-      font-size: 16px;
+      font-size: 14px;
       margin: 4px 2px;
       cursor: pointer;
     }
   </style>
-  
-  
-  <div style="background:#F9F9F9; max-width:900px; margin:0 auto; width:100%; padding:2em .5em;box-sizing:border-box;">
-  
-    <div style="background:#fff; border-radius:15px; max-width:800px; width:100%; margin:2em auto;
+
+  <div style="background:#F9F9F9; max-width:900px; margin:0 auto; width:100%; padding:1em .3em;box-sizing:border-box;">
+    <div style="background:#fff; border-radius:15px; max-width:800px; width:100%; margin:1em auto;
       padding:2em; box-sizing:border-box; box-shadow:0 1px 7px rgba(0,0,0,.07);">
-      <div style="font-size:24px; font-weight:400; color:#4B0082; margin-bottom:1em;">
-        {{productName}} at {{store}} has reached your target price of <b> ₹{{targetPrice}} </b><br>
-      </div>
-  
-      <div style="font-size:24px; font-weight:400; color:#d90d9c; margin-bottom:1em;">
-        {{productName}} now rpiced at <b> ₹{{price}}</b><br>
+      <div style="font-size:22px; font-weight:400; margin-bottom:1em; color:#4B0082;">
+        <span style="color:#C51104;">{{productName}}</span> at <span style="color:#FF5733;">{{store}}</span> has reached
+        your
+        target price of <span style="color:#3342FF;">₹{{targetPrice}}</span>, now priced at <span
+          style="color:#FF3333;">₹{{price}}</span>
+
       </div>
       <div style="text-align: center; margin-top:1em; ">
-        <a href="{{url}}" class="button" target="_blank">Link Button</a>
+        <a href="{{url}}" class="button" target="_blank">Buy Now</a>
       </div>
     </div>
-  
-  
+
+
     <div style="text-align: center; margin-top:1em; ">
-      <div style="color:#737373; font-size:13px; ">Made with ❤ in India</div>
+      <div style="color:#737373; font-size:13px; ">Made with <span style="color:#FE251B;font-size:15px;">❤ </span></div>
     </div>
   </div>
 
