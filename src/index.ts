@@ -146,9 +146,19 @@ app.post('/addProduct', validateBody(addProductValidator), async (req, res) => {
         tracked.product = savedProduct;
         await AppDataSource.manager.save(tracked)
 
+        let productInformation = {
+            productName: savedProduct?.productName,
+            productPrice: savedProduct?.productPrice,
+            store: savedProduct?.store,
+            targetPrice,
+            email,
+            mobile
+        }
         res.send({
             type: 'success',
             message: 'Product Tracked',
+            productInformation
+
         })
     } catch (error) {
         let message = 'Error Adding the product'
