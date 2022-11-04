@@ -23,64 +23,76 @@ import { createSpinner } from 'nanospinner'
         const dbspinner = createSpinner('Connecting To DB').start()
         const dataSource = await AppDataSource.initialize();
         dbspinner.success({ text: 'Connection Successful to DB!', mark: ':)' })
-        // cron.schedule('*/5 * * * *', async () => {
-        //     console.log('running a task every 5 mins');
-        // });
-        // var products = await getAllProducts(dataSource);
-        // console.log(`${products?.length} Products Found`);
-        // var sortedProd = myCustomSort(products);
+        cron.schedule('0 */2 * * *', async () => {
+            const dateObject = new Date();
+            const date = (`0 ${dateObject.getDate()}`).slice(-2);
+            const month = (`0 ${dateObject.getMonth() + 1}`).slice(-2);
+            const year = dateObject.getFullYear();
+            const hours = dateObject.getHours();
+            const minutes = dateObject.getMinutes();
+            const seconds = dateObject.getSeconds();
+            console.log(`fetching Product Prices - ${year}-${month}-${date} ${hours}:${minutes}:${seconds}`);
+            var products = await getAllProducts(dataSource);
+            console.log(`${products?.length} Products Found`);
+            var sortedProd = myCustomSort(products);
 
-        // const priceDropTemplate = fs.readFileSync(path.join(__dirname, "/templates/pricedrop.hbs"), "utf8")
-        // const template = handlebars.compile(priceDropTemplate);
+            const priceDropTemplate = fs.readFileSync(path.join(__dirname, "/templates/pricedrop.hbs"), "utf8")
+            const template = handlebars.compile(priceDropTemplate);
 
-        // var finalInsert = [];
-        // var toNotify = [];
-        // for (let i = 0; i < sortedProd?.length; i++) {
-        //     let storedProduct = sortedProd[i];
-        //     let data = await fetchProductDocument(storedProduct?.url);
-        //     const { document } = new JSDOM(data).window;
+            var finalInsert = [];
+            var toNotify = [];
+            for (let i = 0; i < sortedProd?.length; i++) {
+                let storedProduct = sortedProd[i];
+                let data = await fetchProductDocument(storedProduct?.url);
+                const { document } = new JSDOM(data).window;
 
-        //     let productPrice = queryProductPrice(document, storesEnum[`${storedProduct?.store}`]);
-        //     let outofStock = queryOutOfStock(document, storesEnum[`${storedProduct?.store}`]);
+                let productPrice = queryProductPrice(document, storesEnum[`${storedProduct?.store}`]);
+                let outofStock = queryOutOfStock(document, storesEnum[`${storedProduct?.store}`]);
 
-        //     let tmp = {
-        //         fetchedPrice: productPrice,
-        //         outOfStock: outofStock,
-        //         product: storedProduct?.id,
-        //     }
-        //     finalInsert.push(tmp);
+                let tmp = {
+                    fetchedPrice: productPrice,
+                    outOfStock: outofStock,
+                    product: storedProduct?.id,
+                }
+                finalInsert.push(tmp);
 
-        //     // Get All users who tracked the product
-        //     let trackedInfo = await getTrackedProductsByIdPrice(dataSource, storedProduct.id, productPrice);
-        //     for (let n = 0; n < trackedInfo.length; n++) {
-        //         toNotify.push({
-        //             productName: storedProduct?.productName,
-        //             targetPrice: trackedInfo[i].targetPrice,
-        //             email: trackedInfo[i].email,
-        //             mobile: trackedInfo[i].mobile,
-        //             currentPrice: productPrice,
-        //         })
-        //     }
-        // }
+                if (!outofStock) {
+                    // Get All users who tracked the product
+                    let trackedInfo = await getTrackedProductsByIdPrice(dataSource, storedProduct.id, productPrice);
+                    for (let n = 0; n < trackedInfo.length; n++) {
+                        toNotify.push({
+                            productName: storedProduct?.productName,
+                            targetPrice: trackedInfo[i].targetPrice,
+                            store: storedProduct?.store,
+                            url: storedProduct?.url,
+                            email: trackedInfo[i].email,
+                            mobile: trackedInfo[i].mobile,
+                            currentPrice: productPrice,
+                        })
+                    }
+                }
+            }
 
-        // if (finalInsert?.length > 0) {
-        //     await dataSource.createQueryBuilder().insert().into(PriceTracking).orIgnore().values(finalInsert).execute();
-        // }
-        // for (let i = 0; i < toNotify?.length; i++) {
-        //     const htmlToSend = template({
-        //         productName: toNotify[i].productName,
-        //         targetPrice: toNotify[i].targetPrice,
-        //         price: toNotify[i].currentPrice,
+            if (finalInsert?.length > 0) {
+                await dataSource.createQueryBuilder().insert().into(PriceTracking).orIgnore().values(finalInsert).execute();
+            }
+            for (let i = 0; i < toNotify?.length; i++) {
+                const htmlToSend = template({
+                    productName: toNotify[i].productName,
+                    targetPrice: toNotify[i].targetPrice,
+                    price: toNotify[i].currentPrice,
+                    store: toNotify[i].store,
+                    url: toNotify[i].url
+                });
+                let emailToSend = {
+                    to: toNotify[i].email,
+                    subject: `${toNotify[i].productName} Price Dropped to ${toNotify[i].currentPrice}`,
+                    html: htmlToSend
+                }
+                await sendEmail(emailToSend);
+            }
+        });
 
-        //     });
-        //     let emailToSend = {
-        //         to: toNotify[i].email,
-        //         subject: `${toNotify[i].productName} Price Dropped to ${toNotify[i].currentPrice}`,
-        //         html: htmlToSend
-        //     }
-        //     await sendEmail(emailToSend);
-
-        // }
 
     } catch (error) {
         console.log("Error Connecting to DB", error)
