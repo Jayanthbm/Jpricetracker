@@ -35,6 +35,6 @@
       "deploy": "git add . && git commit -m Heroku && git push heroku master"
    },
    "engines": {
-      "node": "12.16.3"
+      "node": "18.11.0"
    }
 }
