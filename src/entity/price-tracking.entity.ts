@@ -1,7 +1,8 @@
-import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, Index, ManyToOne, PrimaryGeneratedColumn, Unique, UpdateDateColumn } from "typeorm";
 import { Products } from "./products.entity";
 
 @Entity()
+@Index(['fetchedPrice', 'outOfStock', 'product'], { unique: true })
 export class PriceTracking {
   @PrimaryGeneratedColumn()
   id: number;

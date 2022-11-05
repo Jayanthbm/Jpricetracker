@@ -1,10 +1,14 @@
-import { LessThanOrEqual } from "typeorm";
+import { PriceTracking } from "../entity/price-tracking.entity";
 import { ProductTracking } from "../entity/product-tracking.entity";
 import { Products } from "../entity/products.entity";
+import { myCustomSort } from "../helpers";
 
-export const getAllProducts = async (dataSource: any): Promise<Products[]> => {
+export const getAllProducts = async (dataSource: any, customSort = false): Promise<Products[]> => {
   try {
-    const products = await dataSource.getRepository(Products).find();
+    let products = await dataSource.getRepository(Products).find();
+    if (customSort) {
+      return myCustomSort(products);
+    }
     return products;
   } catch (error) {
     console.log("error fetching products", error);
@@ -80,4 +84,15 @@ export const getTrackedProductsByIdPrice = async (dataSource: any, productId: nu
     console.log("error fetching products", error);
     return [];
   }
+}
+
+export const insertPriceTrackingInfo = async (dataSource: any, priceTracking: PriceTracking[]): Promise<number> => {
+  let insertInfo;
+  try {
+    insertInfo = await dataSource.createQueryBuilder().insert().into(PriceTracking).orIgnore().values(priceTracking).execute();
+    return insertInfo.raw.affectedRows;
+  } catch (error) {
+    return 0;
+  }
+
 }
