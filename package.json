@@ -24,7 +24,7 @@
       "node-cron": "^3.0.2",
       "nodemailer": "^6.8.0",
       "reflect-metadata": "^0.1.13",
-      "typeorm": "0.3.10"
+      "typeorm": "0.3.14"
    },
    "scripts": {
       "build": "tsc && npm run copy-assets && npm run start",
